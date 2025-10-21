@@ -2,9 +2,9 @@
 ## 一、 用户表
 | 字段名 | 类型 | 约束 | 说明 |
 |:---:|:---:|:---:|:---:|
-| username | VARCHAR(20) | UNIQUE | 学号或工号 |
+| user_id | VARCHAR(20) | UNIQUE | 学号或工号 |
 | password | VARCHAR(20) | NOT NULL | 密码 |
-| name | VARCHAR(10) | NOT NULL | 姓名 |
+| username | VARCHAR(10) | NOT NULL | 姓名 |
 | role | ENUM('STUDENT', 'TEACHER', 'ADMIN') | DEFAULT 'STUDENT' | 用户权限
 | violation_count | INT | DEFAULT 0 | 违规次数 |
 ## 二、座位区域表
