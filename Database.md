@@ -31,14 +31,14 @@
 | seat_id | INT	| FOREIGN KEY REFERENCES seat(seat_id)	| 座位 |
 | start_time | DATETIME	| NOT NULL | 预约开始时间 |
 | end_time | DATETIME | NOT NULL | 预约结束时间 |
-| status | ENUM('BOOKED','CANCELLED','COMPLETED','EXPIRED')	| DEFAULT 'BOOKED' | 状态 |
+| status | ENUM('BOOKED','CANCELLED','COMPLETED')	| DEFAULT 'BOOKED' | 状态 |
 ## 五、违规记录
 | 字段名 | 类型 | 约束  | 说明  |
 |:---:|:---:|:---:|:---:|
 | violation_id   | INT   | PRIMARY KEY AUTO_INCREMENT                   | 违规记录ID |
 | user_id        | INT    | FOREIGN KEY REFERENCES `user`(user_id)       | 违规用户   |
 | booking_id     | INT    | FOREIGN KEY REFERENCES `booking`(booking_id) | 对应预约   |
-| violation_type | ENUM('NO_SHOW','OVERTIME','MANUAL_REPORT') | NOT NULL   | 违规类型 |
+| violation_type | ENUM('NO_SHOW','OVERTIME') | NOT NULL   | 违规类型 |
 | created_at     | DATETIME  | DEFAULT CURRENT_TIMESTAMP   | 违规时间   |
 | handled_by     | INT   | FOREIGN KEY REFERENCES `user`(user_id)       | 管理员ID  |
 | is_resolved    | BOOLEAN   | DEFAULT FALSE      | 是否处理完毕 |
