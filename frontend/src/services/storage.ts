@@ -558,6 +558,99 @@ export const reservationService = {
     }
     return false;
   },
+
+  // 临时释放座位
+  tempReleaseSeat: (id: string, duration: number, reason: string) => {
+    const reservation = storageService.findById<Reservation>(
+      STORAGE_KEYS.RESERVATIONS,
+      id
+    );
+    
+    if (reservation && reservation.status === "confirmed") {
+      const now = new Date();
+      const expiryTime = new Date(now.getTime() + duration * 60 * 1000);
+      
+      // 更新预约状态为临时释放
+      reservationService.updateReservation(id, {
+        status: "temporarily_released",
+        tempReleaseTime: now.toISOString(),
+        tempReleaseDuration: duration,
+        tempReleaseReason: reason,
+        tempReleaseExpiryTime: expiryTime.toISOString(),
+      });
+
+      // 更新座位状态为临时释放
+      seatService.updateSeatStatus(reservation.seatId, "temporarily_released");
+
+      return true;
+    }
+    return false;
+  },
+
+  // 恢复临时释放的座位
+  resumeTempReleasedSeat: (id: string) => {
+    const reservation = storageService.findById<Reservation>(
+      STORAGE_KEYS.RESERVATIONS,
+      id
+    );
+    
+    if (reservation && reservation.status === "temporarily_released") {
+      // 更新预约状态为已确认
+      reservationService.updateReservation(id, {
+        status: "confirmed",
+        tempReleaseTime: undefined,
+        tempReleaseDuration: undefined,
+        tempReleaseReason: undefined,
+        tempReleaseExpiryTime: undefined,
+      });
+
+      // 更新座位状态为占用
+      seatService.updateSeatStatus(reservation.seatId, "occupied");
+
+      return true;
+    }
+    return false;
+  },
+
+  // 检查临时释放是否过期
+  checkTempReleaseExpiry: (id: string) => {
+    const reservation = storageService.findById<Reservation>(
+      STORAGE_KEYS.RESERVATIONS,
+      id
+    );
+    
+    if (reservation && 
+        reservation.status === "temporarily_released" && 
+        reservation.tempReleaseExpiryTime) {
+      
+      const now = new Date();
+      const expiryTime = new Date(reservation.tempReleaseExpiryTime);
+      
+      if (now > expiryTime) {
+        // 临时释放已过期，自动取消预约
+        reservationService.updateReservation(id, {
+          status: "cancelled",
+          checkOutTime: now.toISOString(),
+        });
+        
+        // 释放座位
+        seatService.updateSeatStatus(reservation.seatId, "available");
+        
+        return true; // 已过期
+      }
+    }
+    return false; // 未过期
+  },
+
+  // 获取用户的临时释放预约
+  getTempReleasedReservations: (userId: string) => {
+    return storageService.findBy<Reservation>(
+      STORAGE_KEYS.RESERVATIONS,
+      (reservation) => 
+        reservation.userId === userId && 
+        reservation.status === "temporarily_released"
+    );
+  },
 };
 
 // 违规相关操作

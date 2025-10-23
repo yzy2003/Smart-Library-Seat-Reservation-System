@@ -17,6 +17,8 @@ import {
   ClockCircleOutlined,
   EnvironmentOutlined,
   HistoryOutlined,
+  PauseCircleOutlined,
+  PlayCircleOutlined,
 } from "@ant-design/icons";
 import { useAuth } from "../contexts/AuthContext";
 import {
@@ -24,14 +26,18 @@ import {
   seatService,
   areaService,
 } from "../services/storage";
-import type { Reservation } from "../types";
+import type { Reservation, TempReleaseForm } from "../types";
 import dayjs from "dayjs";
+import TempReleaseModal from "./TempReleaseModal";
 
 const { Title, Text } = Typography;
 
 const CheckInOut: React.FC = () => {
   const { user } = useAuth();
   const [myReservations, setMyReservations] = useState<Reservation[]>([]);
+  const [tempReleaseModalVisible, setTempReleaseModalVisible] = useState(false);
+  const [selectedReservation, setSelectedReservation] = useState<Reservation | null>(null);
+  const [tempReleaseLoading, setTempReleaseLoading] = useState(false);
 
   useEffect(() => {
     if (user) {
@@ -71,6 +77,51 @@ const CheckInOut: React.FC = () => {
     }
   };
 
+  const handleTempRelease = (reservation: Reservation) => {
+    setSelectedReservation(reservation);
+    setTempReleaseModalVisible(true);
+  };
+
+  const handleTempReleaseConfirm = async (values: TempReleaseForm) => {
+    if (!selectedReservation) return;
+
+    setTempReleaseLoading(true);
+    try {
+      const success = reservationService.tempReleaseSeat(
+        selectedReservation.id,
+        values.duration,
+        values.reason
+      );
+      
+      if (success) {
+        message.success("座位已临时释放！");
+        setTempReleaseModalVisible(false);
+        setSelectedReservation(null);
+        loadMyReservations();
+      } else {
+        message.error("临时释放失败，请重试！");
+      }
+    } catch (error) {
+      message.error("操作失败，请重试！");
+    } finally {
+      setTempReleaseLoading(false);
+    }
+  };
+
+  const handleResumeTempRelease = (reservation: Reservation) => {
+    try {
+      const success = reservationService.resumeTempReleasedSeat(reservation.id);
+      if (success) {
+        message.success("座位已恢复使用！");
+        loadMyReservations();
+      } else {
+        message.error("恢复失败，请重试！");
+      }
+    } catch (error) {
+      message.error("操作失败，请重试！");
+    }
+  };
+
   const getReservationStatus = (reservation: Reservation) => {
     const now = dayjs();
     const startTime = dayjs(reservation.startTime);
@@ -81,6 +132,18 @@ const CheckInOut: React.FC = () => {
     const checkoutTime = reservation.checkOutTime
       ? dayjs(reservation.checkOutTime)
       : null;
+
+    // 临时释放状态
+    if (reservation.status === "temporarily_released") {
+      if (reservation.tempReleaseExpiryTime) {
+        const expiryTime = dayjs(reservation.tempReleaseExpiryTime);
+        if (now.isAfter(expiryTime)) {
+          return { status: "temp_expired", text: "临时释放已过期", color: "red" };
+        }
+        return { status: "temp_released", text: "临时释放中", color: "blue" };
+      }
+      return { status: "temp_released", text: "临时释放中", color: "blue" };
+    }
 
     if (checkoutTime) {
       return { status: "completed", text: "已完成", color: "gray" };
@@ -193,30 +256,54 @@ const CheckInOut: React.FC = () => {
     {
       title: "操作",
       key: "action",
-      render: (_: any, record: Reservation) => (
-        <Space>
-          {canCheckIn(record) && (
-            <Button
-              type="primary"
-              size="small"
-              icon={<CheckCircleOutlined />}
-              onClick={() => handleCheckIn(record)}
-            >
-              签到
-            </Button>
-          )}
-          {canCheckOut(record) && (
-            <Button
-              type="default"
-              size="small"
-              icon={<ClockCircleOutlined />}
-              onClick={() => handleCheckOut(record)}
-            >
-              签退
-            </Button>
-          )}
-        </Space>
-      ),
+      render: (_: any, record: Reservation) => {
+        const statusInfo = getReservationStatus(record);
+        
+        return (
+          <Space>
+            {canCheckIn(record) && (
+              <Button
+                type="primary"
+                size="small"
+                icon={<CheckCircleOutlined />}
+                onClick={() => handleCheckIn(record)}
+              >
+                签到
+              </Button>
+            )}
+            {canCheckOut(record) && (
+              <Button
+                type="default"
+                size="small"
+                icon={<ClockCircleOutlined />}
+                onClick={() => handleCheckOut(record)}
+              >
+                签退
+              </Button>
+            )}
+            {statusInfo.status === "checked_in" && (
+              <Button
+                type="default"
+                size="small"
+                icon={<PauseCircleOutlined />}
+                onClick={() => handleTempRelease(record)}
+              >
+                临时释放
+              </Button>
+            )}
+            {statusInfo.status === "temp_released" && (
+              <Button
+                type="primary"
+                size="small"
+                icon={<PlayCircleOutlined />}
+                onClick={() => handleResumeTempRelease(record)}
+              >
+                恢复使用
+              </Button>
+            )}
+          </Space>
+        );
+      },
     },
   ];
 
@@ -305,6 +392,17 @@ const CheckInOut: React.FC = () => {
           scroll={{ x: 800 }}
         />
       </Card>
+
+      {/* 临时释放模态框 */}
+      <TempReleaseModal
+        visible={tempReleaseModalVisible}
+        onCancel={() => {
+          setTempReleaseModalVisible(false);
+          setSelectedReservation(null);
+        }}
+        onConfirm={handleTempReleaseConfirm}
+        loading={tempReleaseLoading}
+      />
     </div>
   );
 };
