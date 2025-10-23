@@ -35,16 +35,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
   };
 
   const userMenuItems = [
-    {
-      key: 'profile',
-      icon: <UserOutlined />,
-      label: '个人资料',
-    },
-    {
-      key: 'settings',
-      icon: <SettingOutlined />,
-      label: '设置',
-    },
+
     {
       type: 'divider' as const,
     },
@@ -127,7 +118,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
             </Text>
           )}
         </div>
-        
+
         <Menu
           mode="inline"
           selectedKeys={[location.pathname]}
@@ -136,7 +127,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
           style={{ border: 'none' }}
         />
       </Sider>
-      
+
       <AntLayout>
         <Header style={{
           padding: '0 24px',
@@ -152,7 +143,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
             onClick={() => setCollapsed(!collapsed)}
             style={{ fontSize: '16px' }}
           />
-          
+
           <Space>
             <Text>欢迎，{user?.name}</Text>
             <Dropdown
@@ -166,7 +157,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
             </Dropdown>
           </Space>
         </Header>
-        
+
         <Content style={{
           margin: '24px',
           padding: '24px',
