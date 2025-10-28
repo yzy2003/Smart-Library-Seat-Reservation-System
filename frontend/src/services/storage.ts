@@ -141,38 +141,24 @@ const initializeDefaultData = () => {
   // 生成默认座位数据 - 更丰富的座位配置
   const defaultSeats: Seat[] = [];
   defaultAreas.forEach((area) => {
-<<<<<<< HEAD
     // 假设每行最多 10 列
     const colsPerRow = 10;
     const total = area.totalSeats;
     const rows = Math.ceil(total / colsPerRow);
     const lastRowCount = total - (rows - 1) * colsPerRow;
-    const middleColInLastRow = Math.ceil(lastRowCount / 2);
-    const targetIndexInArea = (rows - 1) * colsPerRow + middleColInLastRow; // 从1开始的序号
 
     for (let i = 1; i <= total; i++) {
       const row = Math.ceil(i / colsPerRow);
       const col = ((i - 1) % colsPerRow) + 1;
 
-      // 默认特性：将最后一排的中间座位设置为靠门
+      // 根据座位位置分配特性
       let features: string[] = [];
+      // 将最后一排的中间座位设置为靠门
       if (row === rows && col >= Math.floor(lastRowCount / 3) && col <= Math.ceil(lastRowCount * 2/3)) {
-        features = ["near_exit"];
-      } else if (i % 3 === 0) {
-        features = ["power"];
-      } else if (i % 5 === 0) {
-        features = ["window"];
+        features.push("near_exit");
       }
-=======
-    for (let i = 1; i <= area.totalSeats; i++) {
-      const row = Math.ceil(i / 10);
-      const col = ((i - 1) % 10) + 1;
-      
-      // 根据座位位置和区域特点分配特性
-      let features: string[] = [];
       if (i % 3 === 0) features.push("power");
       if (i % 5 === 0) features.push("window");
-      if (i % 7 === 0) features.push("quiet");
       if (area.id === "area-003") features.push("computer");
       if (area.id === "area-004") features.push("premium");
 
@@ -183,7 +169,6 @@ const initializeDefaultData = () => {
       if (area.id === "area-003" && i <= 20) status = "occupied";
       if (area.id === "area-004" && i <= 5) status = "reserved";
       if (area.id === "area-005" && i <= 20) status = "occupied";
->>>>>>> ca7bbe1c5486d8e0beadfe39fd84d4a02fb6b866
 
       defaultSeats.push({
         id: `seat-${area.id}-${i.toString().padStart(3, "0")}`,
@@ -192,11 +177,7 @@ const initializeDefaultData = () => {
         floor: area.floor,
         row,
         col,
-<<<<<<< HEAD
-        status: "available",
-=======
         status,
->>>>>>> ca7bbe1c5486d8e0beadfe39fd84d4a02fb6b866
         features,
         isReservable: true,
         createdAt: new Date().toISOString(),
