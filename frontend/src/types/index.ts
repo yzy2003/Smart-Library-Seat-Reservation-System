@@ -2,10 +2,10 @@
 export type UserRole = 'admin' | 'student' | 'teacher';
 
 // 座位状态类型
-export type SeatStatus = 'available' | 'occupied' | 'reserved' | 'maintenance';
+export type SeatStatus = 'available' | 'occupied' | 'reserved' | 'maintenance' | 'temporarily_released';
 
 // 预约状态类型
-export type ReservationStatus = 'pending' | 'confirmed' | 'cancelled' | 'completed' | 'expired';
+export type ReservationStatus = 'pending' | 'confirmed' | 'cancelled' | 'completed' | 'expired' | 'temporarily_released';
 
 // 违规类型
 export type ViolationType = 'no_show' | 'overstay' | 'late_checkin' | 'unauthorized_use';
@@ -53,6 +53,11 @@ export interface Reservation {
   checkOutTime?: string; // 签退时间
   qrCode?: string; // 二维码数据
   notes?: string; // 备注
+  // 临时释放相关字段
+  tempReleaseTime?: string; // 临时释放时间
+  tempReleaseDuration?: number; // 临时释放时长（分钟）
+  tempReleaseReason?: string; // 临时释放原因
+  tempReleaseExpiryTime?: string; // 临时释放到期时间
   createdAt: string;
   updatedAt: string;
 }
@@ -109,6 +114,12 @@ export interface ReservationForm {
   startTime: string;
   endTime: string;
   notes?: string;
+}
+
+// 临时释放表单接口
+export interface TempReleaseForm {
+  duration: number; // 临时释放时长（分钟）
+  reason: string; // 临时释放原因
 }
 
 // 座位查询参数接口

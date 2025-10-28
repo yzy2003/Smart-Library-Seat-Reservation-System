@@ -6,6 +6,7 @@ import {
   ClockCircleOutlined,
   CloseCircleOutlined,
   ToolOutlined,
+  PauseCircleOutlined,
   PlusOutlined
 } from '@ant-design/icons';
 import { seatService, reservationService, areaService } from '../services/storage';
@@ -87,6 +88,7 @@ const SeatVisualization: React.FC<SeatVisualizationProps> = ({ onSeatSelect, sel
       case 'occupied': return '#fa8c16';
       case 'reserved': return '#722ed1';
       case 'maintenance': return '#f5222d';
+      case 'temporarily_released': return '#1890ff';
       default: return '#d9d9d9';
     }
   };
@@ -97,6 +99,7 @@ const SeatVisualization: React.FC<SeatVisualizationProps> = ({ onSeatSelect, sel
       case 'occupied': return <CloseCircleOutlined />;
       case 'reserved': return <ClockCircleOutlined />;
       case 'maintenance': return <ToolOutlined />;
+      case 'temporarily_released': return <PauseCircleOutlined />;
       default: return <BookOutlined />;
     }
   };
@@ -107,6 +110,7 @@ const SeatVisualization: React.FC<SeatVisualizationProps> = ({ onSeatSelect, sel
       case 'occupied': return '占用';
       case 'reserved': return '已预约';
       case 'maintenance': return '维护中';
+      case 'temporarily_released': return '临时释放';
       default: return '未知';
     }
   };
