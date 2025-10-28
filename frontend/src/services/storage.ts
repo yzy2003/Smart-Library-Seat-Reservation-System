@@ -68,9 +68,27 @@ const initializeDefaultData = () => {
   // 生成默认座位
   const defaultSeats: Seat[] = [];
   defaultAreas.forEach((area) => {
-    for (let i = 1; i <= area.totalSeats; i++) {
-      const row = Math.ceil(i / 10);
-      const col = ((i - 1) % 10) + 1;
+    // 假设每行最多 10 列
+    const colsPerRow = 10;
+    const total = area.totalSeats;
+    const rows = Math.ceil(total / colsPerRow);
+    const lastRowCount = total - (rows - 1) * colsPerRow;
+    const middleColInLastRow = Math.ceil(lastRowCount / 2);
+    const targetIndexInArea = (rows - 1) * colsPerRow + middleColInLastRow; // 从1开始的序号
+
+    for (let i = 1; i <= total; i++) {
+      const row = Math.ceil(i / colsPerRow);
+      const col = ((i - 1) % colsPerRow) + 1;
+
+      // 默认特性：将最后一排的中间座位设置为靠门
+      let features: string[] = [];
+      if (row === rows && col >= Math.floor(lastRowCount / 3) && col <= Math.ceil(lastRowCount * 2/3)) {
+        features = ["near_exit"];
+      } else if (i % 3 === 0) {
+        features = ["power"];
+      } else if (i % 5 === 0) {
+        features = ["window"];
+      }
 
       defaultSeats.push({
         id: `seat-${area.id}-${i.toString().padStart(3, "0")}`,
@@ -80,7 +98,7 @@ const initializeDefaultData = () => {
         row,
         col,
         status: "available",
-        features: i % 3 === 0 ? ["power"] : i % 5 === 0 ? ["window"] : [],
+        features,
         isReservable: true,
         createdAt: new Date().toISOString(),
       });

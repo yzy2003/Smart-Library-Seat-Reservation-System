@@ -3,6 +3,8 @@ import { Card, Row, Col, Typography } from 'antd';
 import SeatVisualization from './SeatVisualization';
 import { seatService, areaService } from '../services/storage';
 import type { Seat, Area } from '../types';
+import { FEATURE_META } from '../constants/seatFeatures';
+import type { SeatFeature } from '../constants/seatFeatures';
 
 const { Title, Text } = Typography;
 
@@ -81,7 +83,12 @@ const SeatManagement: React.FC = () => {
                 </div>
                 <div>
                   <Text strong>特性: </Text>
-                  <Text>{selectedSeat.features.join(', ') || '无'}</Text>
+                  <Text>
+                    {selectedSeat.features && selectedSeat.features.length > 0
+                      ? selectedSeat.features.map(f => FEATURE_META[f as SeatFeature]?.label || f).join(', ')
+                      : '无'
+                    }
+                  </Text>
                 </div>
               </div>
             ) : (

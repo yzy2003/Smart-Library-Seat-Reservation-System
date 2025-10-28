@@ -10,6 +10,8 @@ import {
 } from '@ant-design/icons';
 import { seatService, reservationService, areaService } from '../services/storage';
 import type { Seat, Area, Reservation, SeatStatus } from '../types';
+import { FEATURE_META } from '../constants/seatFeatures';
+import type { SeatFeature } from '../constants/seatFeatures';
 import { useAuth } from '../contexts/AuthContext';
 import dayjs from 'dayjs';
 
@@ -27,7 +29,8 @@ const SeatVisualization: React.FC<SeatVisualizationProps> = ({ onSeatSelect, sel
   const [areas, setAreas] = useState<Area[]>([]);
   const [seats, setSeats] = useState<Seat[]>([]);
   const [selectedArea, setSelectedArea] = useState<string>('');
-  const [selectedFloor, setSelectedFloor] = useState<number>(1);
+  // 默认选择楼层 1
+  const [selectedFloor, setSelectedFloor] = useState<number | null>(1);
   const [timeRange, setTimeRange] = useState<[dayjs.Dayjs, dayjs.Dayjs] | null>(null);
   const [reservationModalVisible, setReservationModalVisible] = useState(false);
   const [reservationForm] = Form.useForm();
@@ -36,19 +39,39 @@ const SeatVisualization: React.FC<SeatVisualizationProps> = ({ onSeatSelect, sel
     loadAreas();
   }, []);
 
+  // 当选中区域或者时间范围变化时加载座位
   useEffect(() => {
     if (selectedArea) {
       loadSeats();
+    } else {
+      setSeats([]);
     }
   }, [selectedArea, timeRange]);
 
   const loadAreas = () => {
     const allAreas = areaService.getAllAreas();
     setAreas(allAreas);
-    if (allAreas.length > 0) {
-      setSelectedArea(allAreas[0].id);
-    }
+    // 不自动选择区域；用户需要先选择楼层
   };
+
+  // 当 areas 或 selectedFloor 改变时，如果当前未选择区域，则自动选择该楼层的第一个区域并加载座位
+  useEffect(() => {
+    if (!areas || areas.length === 0) return;
+    if (selectedFloor === null) return;
+
+    const floorAreas = areas.filter(a => a.floor === selectedFloor);
+    if (floorAreas.length > 0) {
+      const firstArea = floorAreas[0];
+      // 仅当未选择区域或选择的区域不属于该楼层时，自动选择第一个区域
+      if (!selectedArea || areas.find(a => a.id === selectedArea)?.floor !== selectedFloor) {
+        setSelectedArea(firstArea.id);
+        loadSeats(firstArea.id);
+      }
+    } else {
+      setSelectedArea('');
+      setSeats([]);
+    }
+  }, [areas, selectedFloor]);
 
   const loadSeats = (areaId?: string) => {
     const targetArea = areaId || selectedArea;
@@ -224,36 +247,51 @@ const SeatVisualization: React.FC<SeatVisualizationProps> = ({ onSeatSelect, sel
           <Title level={4}>座位可视化</Title>
           
           <Space wrap style={{ marginBottom: '16px' }}>
+            {/* 先选择楼层，再选择对应楼层的区域 */}
             <Select
-              value={selectedArea}
-              onChange={(value) => {
-                setSelectedArea(value);
-                loadSeats(value);
-              }}
-              style={{ width: 200 }}
-              placeholder="选择区域"
-            >
-              {areas.map(area => (
-                <Option key={area.id} value={area.id}>
-                  {area.name} (楼层 {area.floor})
-                </Option>
-              ))}
-            </Select>
-
-            <Select
-              value={selectedFloor}
-              onChange={(value) => {
+              value={selectedFloor ?? undefined}
+              onChange={(value: number) => {
                 setSelectedFloor(value);
-                loadSeats();
+                // 选择楼层后，自动选中该楼层的第一个区域（若存在），并加载该区域座位
+                const floorAreas = areas.filter(a => a.floor === value);
+                if (floorAreas.length > 0) {
+                  const firstArea = floorAreas[0];
+                  setSelectedArea(firstArea.id);
+                  loadSeats(firstArea.id);
+                } else {
+                  // 若该楼层无区域，则清空区域与座位数据
+                  setSelectedArea('');
+                  setSeats([]);
+                }
               }}
               style={{ width: 120 }}
               placeholder="选择楼层"
             >
-              {Array.from(new Set(seats.filter(s => s.area === selectedArea).map(s => s.floor)))
+              {Array.from(new Set(areas.map(a => a.floor)))
                 .sort()
                 .map(floor => (
-                  <Option key={floor} value={floor}>
+                  <Option key={floor} value={floor as number}>
                     楼层 {floor}
+                  </Option>
+                ))}
+            </Select>
+
+            <Select
+              value={selectedArea}
+              onChange={(value) => {
+                setSelectedArea(value);
+                // 仅在区域被选中时加载该区域的座位
+                loadSeats(value);
+              }}
+              style={{ width: 200 }}
+              placeholder="选择区域"
+              disabled={selectedFloor === null}
+            >
+              {areas
+                .filter(area => selectedFloor === null ? true : area.floor === selectedFloor)
+                .map(area => (
+                  <Option key={area.id} value={area.id}>
+                    {area.name}
                   </Option>
                 ))}
             </Select>
@@ -321,7 +359,12 @@ const SeatVisualization: React.FC<SeatVisualizationProps> = ({ onSeatSelect, sel
             <Title level={5}>选中座位: {selectedSeat.number}</Title>
             <Text>状态: {getSeatStatusText(selectedSeat.status)}</Text>
             <br />
-            <Text>特性: {selectedSeat.features.join(', ') || '无'}</Text>
+            <Text>
+              特性: {selectedSeat.features && selectedSeat.features.length > 0
+                ? selectedSeat.features.map(f => FEATURE_META[f as SeatFeature]?.label || f).join(', ')
+                : '无'
+              }
+            </Text>
             
             {selectedSeat.status === 'available' && selectedSeat.isReservable && user && (
               <div style={{ marginTop: '12px' }}>
