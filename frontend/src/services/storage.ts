@@ -650,16 +650,6 @@ export const reservationService = {
     }
     return false; // 未过期
   },
-
-  // 获取用户的临时释放预约
-  getTempReleasedReservations: (userId: string) => {
-    return storageService.findBy<Reservation>(
-      STORAGE_KEYS.RESERVATIONS,
-      (reservation) => 
-        reservation.userId === userId && 
-        reservation.status === "temporarily_released"
-    );
-  },
 };
 
 // 违规相关操作
