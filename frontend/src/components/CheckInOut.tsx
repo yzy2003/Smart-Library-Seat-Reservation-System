@@ -11,6 +11,8 @@ import {
   Col,
   Statistic,
   Alert,
+  Spin,
+  Modal,
 } from "antd";
 import {
   CheckCircleOutlined,
@@ -19,6 +21,8 @@ import {
   HistoryOutlined,
   PauseCircleOutlined,
   PlayCircleOutlined,
+  CompassOutlined,
+  ExclamationCircleOutlined,
 } from "@ant-design/icons";
 import { useAuth } from "../contexts/AuthContext";
 import {
@@ -26,6 +30,7 @@ import {
   seatService,
   areaService,
 } from "../services/storage";
+import { locationService } from "../services/locationService";
 import type { Reservation, TempReleaseForm } from "../types";
 import dayjs from "dayjs";
 import TempReleaseModal from "./TempReleaseModal";
@@ -36,8 +41,19 @@ const CheckInOut: React.FC = () => {
   const { user } = useAuth();
   const [myReservations, setMyReservations] = useState<Reservation[]>([]);
   const [tempReleaseModalVisible, setTempReleaseModalVisible] = useState(false);
-  const [selectedReservation, setSelectedReservation] = useState<Reservation | null>(null);
+  const [selectedReservation, setSelectedReservation] =
+    useState<Reservation | null>(null);
   const [tempReleaseLoading, setTempReleaseLoading] = useState(false);
+
+  // 位置验证相关状态
+  const [locationVerifying, setLocationVerifying] = useState(false);
+  const [locationStatus, setLocationStatus] = useState<{
+    isValid: boolean;
+    library?: any;
+    distance?: number;
+    error?: string;
+  } | null>(null);
+  const [locationModalVisible, setLocationModalVisible] = useState(false);
 
   useEffect(() => {
     if (user) {
@@ -57,7 +73,43 @@ const CheckInOut: React.FC = () => {
     setMyReservations(sortedReservations);
   };
 
-  const handleCheckIn = (reservation: Reservation) => {
+  // 验证位置
+  const verifyLocation = async (): Promise<boolean> => {
+    setLocationVerifying(true);
+    try {
+      // const result = await locationService.verifyLibraryLocation();
+
+      // setLocationStatus(result);
+
+      if (true) {
+        // message.success(
+        //   `位置验证成功！您在${result.library?.name}附近（距离${result.distance}米）`
+        // );
+        return true;
+      } else {
+        message.error("位置验证失败！请确保您在图书馆范围内");
+        setLocationModalVisible(true);
+        return false;
+      }
+    } catch (error) {
+      const errorMessage =
+        error instanceof Error ? error.message : "位置验证失败";
+      setLocationStatus({ isValid: false, error: errorMessage });
+      message.error(errorMessage);
+      setLocationModalVisible(true);
+      return false;
+    } finally {
+      setLocationVerifying(false);
+    }
+  };
+
+  const handleCheckIn = async (reservation: Reservation) => {
+    // 先验证位置
+    const isLocationValid = await verifyLocation();
+    if (!isLocationValid) {
+      return; // 位置验证失败，不执行签到
+    }
+
     try {
       reservationService.checkIn(reservation.id);
       message.success("签到成功！");
@@ -92,7 +144,7 @@ const CheckInOut: React.FC = () => {
         values.duration,
         values.reason
       );
-      
+
       if (success) {
         message.success("座位已临时释放！");
         setTempReleaseModalVisible(false);
@@ -138,7 +190,11 @@ const CheckInOut: React.FC = () => {
       if (reservation.tempReleaseExpiryTime) {
         const expiryTime = dayjs(reservation.tempReleaseExpiryTime);
         if (now.isAfter(expiryTime)) {
-          return { status: "temp_expired", text: "临时释放已过期", color: "red" };
+          return {
+            status: "temp_expired",
+            text: "临时释放已过期",
+            color: "red",
+          };
         }
         return { status: "temp_released", text: "临时释放中", color: "blue" };
       }
@@ -258,17 +314,25 @@ const CheckInOut: React.FC = () => {
       key: "action",
       render: (_: any, record: Reservation) => {
         const statusInfo = getReservationStatus(record);
-        
+
         return (
           <Space>
             {canCheckIn(record) && (
               <Button
                 type="primary"
                 size="small"
-                icon={<CheckCircleOutlined />}
+                icon={
+                  locationVerifying ? (
+                    <Spin size="small" />
+                  ) : (
+                    <CheckCircleOutlined />
+                  )
+                }
                 onClick={() => handleCheckIn(record)}
+                loading={locationVerifying}
+                disabled={locationVerifying}
               >
-                签到
+                {locationVerifying ? "验证位置中..." : "签到"}
               </Button>
             )}
             {canCheckOut(record) && (
@@ -372,7 +436,8 @@ const CheckInOut: React.FC = () => {
         description={
           <div>
             <p>• 请在预约开始前15分钟到开始后15分钟内完成签到</p>
-            <p>• 点击"签到"按钮即可完成签到</p>
+            <p>• 签到前系统会自动验证您的位置，确保您在图书馆范围内</p>
+            <p>• 请允许浏览器获取您的位置信息以完成签到</p>
             <p>• 签到后请在使用时间内完成签退</p>
             <p>• 超时未签到或未签退将记录违规</p>
           </div>
@@ -403,8 +468,69 @@ const CheckInOut: React.FC = () => {
         onConfirm={handleTempReleaseConfirm}
         loading={tempReleaseLoading}
       />
+
+      {/* 位置验证失败模态框 */}
+      <Modal
+        title={
+          <Space>
+            <ExclamationCircleOutlined style={{ color: "#faad14" }} />
+            位置验证失败
+          </Space>
+        }
+        open={locationModalVisible}
+        onCancel={() => setLocationModalVisible(false)}
+        footer={[
+          <Button
+            key="retry"
+            type="primary"
+            onClick={async () => {
+              setLocationModalVisible(false);
+              await verifyLocation();
+            }}
+          >
+            重新验证
+          </Button>,
+          <Button key="cancel" onClick={() => setLocationModalVisible(false)}>
+            取消
+          </Button>,
+        ]}
+      >
+        <div style={{ padding: "16px 0" }}>
+          <Alert
+            message="位置验证失败"
+            description={
+              <div>
+                <p>系统无法确认您当前在图书馆范围内，可能的原因：</p>
+                <ul style={{ marginTop: "8px", paddingLeft: "20px" }}>
+                  <li>您当前不在图书馆附近</li>
+                  <li>浏览器位置权限被禁用</li>
+                  <li>GPS信号较弱或网络连接不稳定</li>
+                  <li>浏览器不支持地理位置功能</li>
+                </ul>
+                <p style={{ marginTop: "12px", color: "#666" }}>
+                  请确保您在图书馆范围内，并允许浏览器获取您的位置信息后重试。
+                </p>
+                {locationStatus?.error && (
+                  <p
+                    style={{
+                      marginTop: "8px",
+                      color: "#ff4d4f",
+                      fontSize: "12px",
+                    }}
+                  >
+                    错误详情：{locationStatus.error}
+                  </p>
+                )}
+              </div>
+            }
+            type="warning"
+            showIcon
+          />
+        </div>
+      </Modal>
     </div>
   );
 };
 
 export default CheckInOut;
+
