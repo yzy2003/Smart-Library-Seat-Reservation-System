@@ -1,44 +1,103 @@
-# 数据关系表
-## 一、 用户表
-| 字段名 | 类型 | 约束 | 说明 |
-|:---:|:---:|:---:|:---:|
-| user_id | VARCHAR(20) | UNIQUE | 学号或工号 |
-| password | VARCHAR(20) | NOT NULL | 密码 |
-| username | VARCHAR(10) | NOT NULL | 姓名 |
-| role | ENUM('STUDENT', 'TEACHER', 'ADMIN') | DEFAULT 'STUDENT' | 用户权限
-| violation_count | INT | DEFAULT 0 | 违规次数 |
-## 二、座位区域表
-| 字段名 | 类型 | 约束 | 说明 |
-|:---:|:---:|:---:|:---:|
-| area_id | INT |  PRIMARY KEY AUTO_INCREMENT | 区域ID |
-| area_name | VARCHAR(50) | UNIQUE | 区域名称 |
-| seat_count | INT | | 座位总数 |
-| free_seat_count | INT | | 空闲座位数量 |
-## 三、座位表
-| 字段名 | 类型 | 约束 | 说明 |
-|:---:|:---:|:---:|:---:|
-| area_id | INT | FOREIGN KEY REFERENCES `seat_area`(area_id) ON DELETE CASCADE | 所属区域
-| seat_id | INT | PRIMARY KEY AUTO_INCREMENT | 座位ID |
-| status | ENUM('FREE','RESERVED','OCCUPIED')| DEFAULT'FREE'  | 当前状态 |
-| current_user_id | INT                                | NULL, FOREIGN KEY 
-| position_x | INT | | 平面坐标X |
-| position_y | INT | | 平面坐标Y |
-## 四、预约、使用表
-| 字段名 | 类型 | 约束 | 说明 |
-|:---:|:---:|:---:|:---:|
-| booking_id	| INT | PRIMARY KEY AUTO_INCREMENT |	预约ID |
-| user_id | INT | FOREIGN KEY REFERENCES user(user_id) | 预约用户 |
-| seat_id | INT	| FOREIGN KEY REFERENCES seat(seat_id)	| 座位 |
-| start_time | DATETIME	| NOT NULL | 预约开始时间 |
-| end_time | DATETIME | NOT NULL | 预约结束时间 |
-| status | ENUM('BOOKED','CANCELLED','COMPLETED')	| DEFAULT 'BOOKED' | 状态 |
-## 五、违规记录
-| 字段名 | 类型 | 约束  | 说明  |
-|:---:|:---:|:---:|:---:|
-| violation_id   | INT   | PRIMARY KEY AUTO_INCREMENT                   | 违规记录ID |
-| user_id        | INT    | FOREIGN KEY REFERENCES `user`(user_id)       | 违规用户   |
-| booking_id     | INT    | FOREIGN KEY REFERENCES `booking`(booking_id) | 对应预约   |
-| violation_type | ENUM('NO_SHOW','OVERTIME') | NOT NULL   | 违规类型 |
-| created_at     | DATETIME  | DEFAULT CURRENT_TIMESTAMP   | 违规时间   |
-| handled_by     | INT   | FOREIGN KEY REFERENCES `user`(user_id)       | 管理员ID  |
-| is_resolved    | BOOLEAN   | DEFAULT FALSE      | 是否处理完毕 |
+-- 用户表
+CREATE TABLE users (
+  id              VARCHAR(36) PRIMARY KEY,
+  username        VARCHAR(64) NOT NULL UNIQUE,
+  password_hash   VARCHAR(255) NOT NULL,
+  role            ENUM('admin','student','teacher') NOT NULL,
+  name            VARCHAR(100) NOT NULL,
+  student_id      VARCHAR(32),
+  teacher_id      VARCHAR(32),
+  email           VARCHAR(128) NOT NULL,
+  phone           VARCHAR(32),
+  violation_count INT NOT NULL DEFAULT 0,
+  is_banned       TINYINT(1) NOT NULL DEFAULT 0,
+  created_at      DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+  last_login_at   DATETIME(3) NULL,
+  CONSTRAINT chk_users_role CHECK (role IN ('admin','student','teacher'))
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- 区域表
+CREATE TABLE areas (
+  id               VARCHAR(36) PRIMARY KEY,
+  name             VARCHAR(100) NOT NULL,
+  floor            INT NOT NULL,
+  description      VARCHAR(255),
+  total_seats      INT NOT NULL DEFAULT 0,
+  available_seats  INT NOT NULL DEFAULT 0,
+  is_active        TINYINT(1) NOT NULL DEFAULT 1
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- 座位表
+CREATE TABLE seats (
+  id            VARCHAR(36) PRIMARY KEY,
+  number        VARCHAR(50) NOT NULL,
+  area_id       VARCHAR(36) NOT NULL,
+  floor         INT NOT NULL,
+  row_no        INT NOT NULL,
+  col_no        INT NOT NULL,
+  status        ENUM('available','occupied','reserved','maintenance','temporarily_released') NOT NULL DEFAULT 'available',
+  features_json JSON NULL,            -- 对应前端 features:string[]，用 JSON 存储
+  is_reservable TINYINT(1) NOT NULL DEFAULT 1,
+  created_at    DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+  CONSTRAINT fk_seats_area FOREIGN KEY (area_id) REFERENCES areas(id),
+  INDEX idx_seats_area (area_id),
+  INDEX idx_seats_area_floor (area_id, floor),
+  INDEX idx_seats_grid (area_id, row_no, col_no),
+  CONSTRAINT chk_seat_status CHECK (status IN ('available','occupied','reserved','maintenance','temporarily_released'))
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- 预约表
+CREATE TABLE reservations (
+  id                       VARCHAR(36) PRIMARY KEY,
+  user_id                  VARCHAR(36) NOT NULL,
+  seat_id                  VARCHAR(36) NOT NULL,
+  start_time               DATETIME(3) NOT NULL,
+  end_time                 DATETIME(3) NOT NULL,
+  status                   ENUM('pending','confirmed','cancelled','completed','expired','temporarily_released') NOT NULL,
+  checkin_time             DATETIME(3) NULL,
+  checkout_time            DATETIME(3) NULL,
+  qr_code                  VARCHAR(512) NULL,
+  notes                    VARCHAR(255) NULL,
+  -- 临时释放相关
+  temp_release_time        DATETIME(3) NULL,
+  temp_release_duration    INT NULL,           -- 分钟
+  temp_release_reason      VARCHAR(255) NULL,
+  temp_release_expiry_time DATETIME(3) NULL,
+  created_at               DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+  updated_at               DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
+  CONSTRAINT fk_resv_user FOREIGN KEY (user_id) REFERENCES users(id),
+  CONSTRAINT fk_resv_seat FOREIGN KEY (seat_id) REFERENCES seats(id),
+  INDEX idx_resv_user_time (user_id, start_time, end_time),
+  INDEX idx_resv_seat_time (seat_id, start_time, end_time),
+  INDEX idx_resv_status (status),
+  CONSTRAINT chk_resv_status CHECK (status IN ('pending','confirmed','cancelled','completed','expired','temporarily_released'))
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- 违规表
+CREATE TABLE violations (
+  id            VARCHAR(36) PRIMARY KEY,
+  user_id       VARCHAR(36) NOT NULL,
+  reservation_id VARCHAR(36) NULL,
+  type          ENUM('no_show','overstay','late_checkin','unauthorized_use','frequent_cancellation','unauthorized_extension') NOT NULL,
+  description   VARCHAR(512) NOT NULL,
+  penalty       VARCHAR(255) NOT NULL,
+  is_resolved   TINYINT(1) NOT NULL DEFAULT 0,
+  created_at    DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+  resolved_at   DATETIME(3) NULL,
+  resolved_by   VARCHAR(36) NULL, -- 管理员用户ID
+  CONSTRAINT fk_violation_user FOREIGN KEY (user_id) REFERENCES users(id),
+  CONSTRAINT fk_violation_resv FOREIGN KEY (reservation_id) REFERENCES reservations(id),
+  INDEX idx_violation_user_date (user_id, created_at),
+  INDEX idx_violation_type_date (type, created_at),
+  INDEX idx_violation_resolved (is_resolved)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- 可选：图书馆地理围栏（用于位置校验的生产化配置）
+CREATE TABLE library_locations (
+  id        VARCHAR(36) PRIMARY KEY,
+  name      VARCHAR(100) NOT NULL,
+  latitude  DECIMAL(10,7) NOT NULL,
+  longitude DECIMAL(10,7) NOT NULL,
+  radius_m  INT NOT NULL DEFAULT 100, -- 米
+  is_active TINYINT(1) NOT NULL DEFAULT 1
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
