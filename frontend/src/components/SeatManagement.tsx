@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { Card, Row, Col, Typography } from 'antd';
+import { Card, Row, Col, Typography, Space, Button, message } from 'antd';
 import SeatVisualization from './SeatVisualization';
 import { seatService, areaService } from '../services/storage';
 import type { Seat, Area } from '../types';
 import { FEATURE_META } from '../constants/seatFeatures';
 import type { SeatFeature } from '../constants/seatFeatures';
+import { useAuth } from '../contexts/AuthContext';
 
 const { Title, Text } = Typography;
 
@@ -12,6 +13,7 @@ const SeatManagement: React.FC = () => {
   const [selectedSeat, setSelectedSeat] = useState<Seat | null>(null);
   const [areas, setAreas] = useState<Area[]>([]);
   const [seats, setSeats] = useState<Seat[]>([]);
+  const { user } = useAuth();
 
   useEffect(() => {
     loadData();
@@ -28,6 +30,26 @@ const SeatManagement: React.FC = () => {
     setSelectedSeat(seat);
   };
 
+  const refreshAfterAdminUpdate = (updatedId: string) => {
+    const allSeats = seatService.getAllSeats();
+    setSeats(allSeats);
+    if (selectedSeat && selectedSeat.id === updatedId) {
+      const latest = allSeats.find(s => s.id === updatedId) || null;
+      setSelectedSeat(latest);
+    }
+  };
+
+  const adminSetStatus = (status: Seat['status']) => {
+    if (!user || user.role !== 'admin' || !selectedSeat) return;
+    const updated = seatService.adminUpdateSeatStatus(selectedSeat.id, status);
+    if (updated) {
+      message.success('座位状态已更新');
+      refreshAfterAdminUpdate(selectedSeat.id);
+    } else {
+      message.error('更新失败');
+    }
+  };
+
   return (
     <div>
       <div style={{ marginBottom: '24px' }}>
@@ -42,6 +64,7 @@ const SeatManagement: React.FC = () => {
           <SeatVisualization 
             onSeatSelect={handleSeatSelect}
             selectedSeat={selectedSeat}
+            seatsList={seats}
           />
         </Col>
         
@@ -90,6 +113,19 @@ const SeatManagement: React.FC = () => {
                     }
                   </Text>
                 </div>
+                {user && user.role === 'admin' && (
+                  <div style={{ marginTop: '16px' }}>
+                    <Typography.Text strong>管理员操作：</Typography.Text>
+                    <div style={{ marginTop: '8px' }}>
+                      <Space wrap>
+                        <Button size="small" onClick={() => adminSetStatus('available')}>设为可用</Button>
+                        <Button size="small" onClick={() => adminSetStatus('occupied')}>设为占用</Button>
+                        <Button size="small" onClick={() => adminSetStatus('reserved')}>设为已预约</Button>
+                        <Button size="small" danger onClick={() => adminSetStatus('maintenance')}>设为维护中</Button>
+                      </Space>
+                    </div>
+                  </div>
+                )}
               </div>
             ) : (
               <Text type="secondary">请选择一个座位查看详细信息</Text>

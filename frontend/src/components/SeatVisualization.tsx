@@ -23,12 +23,14 @@ const { RangePicker } = DatePicker;
 interface SeatVisualizationProps {
   onSeatSelect?: (seat: Seat) => void;
   selectedSeat?: Seat | null;
+  seatsList?: Seat[];
 }
 
-const SeatVisualization: React.FC<SeatVisualizationProps> = ({ onSeatSelect, selectedSeat }) => {
+const SeatVisualization: React.FC<SeatVisualizationProps> = ({ onSeatSelect, selectedSeat, seatsList }) => {
   const { user } = useAuth();
   const [areas, setAreas] = useState<Area[]>([]);
   const [seats, setSeats] = useState<Seat[]>([]);
+  const activeSeats = seatsList ?? seats;
   const [selectedArea, setSelectedArea] = useState<string>('');
   // 默认选择楼层 1
   const [selectedFloor, setSelectedFloor] = useState<number | null>(1);
@@ -116,6 +118,13 @@ const SeatVisualization: React.FC<SeatVisualizationProps> = ({ onSeatSelect, sel
   };
 
   const handleSeatClick = (seat: Seat) => {
+    if (user && user.role === 'admin') {
+      if (seat) {
+        onSeatSelect?.(seat);
+      }
+      return;
+    }
+    // 普通用户只能点可用可预约
     if (seat.status === 'available' && seat.isReservable) {
       onSeatSelect?.(seat);
     }
@@ -157,7 +166,7 @@ const SeatVisualization: React.FC<SeatVisualizationProps> = ({ onSeatSelect, sel
   const renderSeatGrid = () => {
     if (!selectedArea) return null;
 
-    const areaSeats = seats.filter(seat => seat.area === selectedArea && seat.floor === selectedFloor);
+    const areaSeats = activeSeats.filter(seat => seat.area === selectedArea && seat.floor === selectedFloor);
     
     if (areaSeats.length === 0) {
       return (
@@ -192,7 +201,9 @@ const SeatVisualization: React.FC<SeatVisualizationProps> = ({ onSeatSelect, sel
           }
 
           const isSelected = selectedSeat?.id === seat.id;
-          const isClickable = seat.status === 'available' && seat.isReservable;
+          const isClickable = (user && user.role === 'admin')
+            ? !!seat
+            : seat.status === 'available' && seat.isReservable;
 
           return (
             <div

@@ -413,6 +413,32 @@ export const userService = {
     };
     return storageService.add<User>(STORAGE_KEYS.USERS, newUser);
   },
+
+  // 删除用户（并清理其相关预约与违规记录）
+  deleteUser: (id: string) => {
+    const deleted = storageService.delete<User>(STORAGE_KEYS.USERS, id);
+    if (!deleted) return false;
+
+    // 清理该用户的预约
+    const reservations = storageService.findBy<Reservation>(
+      STORAGE_KEYS.RESERVATIONS,
+      (r) => r.userId === id
+    );
+    reservations.forEach((r) => {
+      storageService.delete<Reservation>(STORAGE_KEYS.RESERVATIONS, r.id);
+    });
+
+    // 清理该用户的违规记录
+    const violations = storageService.findBy<Violation>(
+      STORAGE_KEYS.VIOLATIONS,
+      (v) => v.userId === id
+    );
+    violations.forEach((v) => {
+      storageService.delete<Violation>(STORAGE_KEYS.VIOLATIONS, v.id);
+    });
+
+    return true;
+  },
 };
 
 // 座位相关操作
@@ -430,6 +456,11 @@ export const seatService = {
 
   // 更新座位状态
   updateSeatStatus: (id: string, status: SeatStatus) => {
+    return storageService.update<Seat>(STORAGE_KEYS.SEATS, id, { status });
+  },
+
+  // 管理员更新座位状态（不受业务流程限制）
+  adminUpdateSeatStatus: (id: string, status: SeatStatus) => {
     return storageService.update<Seat>(STORAGE_KEYS.SEATS, id, { status });
   },
 
